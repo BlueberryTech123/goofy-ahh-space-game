@@ -1,0 +1,37 @@
+body {
+    margin: 0;
+    font-family: 'Courier New', Courier, monospace;
+}
+.hidden {
+    display: none;
+}
+#debug {
+    background: rgba(69, 69, 69, 0.3);
+    border: 1px dashed #bbb;
+    color: #fff;
+    padding: 10px;
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 300px;
+}
+#errors {
+    border: 1px dotted #aaa;
+    color: #f00;
+    padding: 10px;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    width: 300px;
+    height: 250px;
+    overflow-y: scroll;
+}
+
+#menu {
+    background: rgba(15, 15, 15, 0.8);
+    color: #eee;
+    position: fixed;
+    width: 100vw;
+    height: 100vh;
+    padding: 69px;
+}
