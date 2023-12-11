@@ -14,19 +14,21 @@
 		<link rel="stylesheet" href="style.css">
 	</head>
 	<body onerror="document.getElementById('errors').innerHTML += `${event}<br>Line: ${lineno}<hr>`">
-		<script type="module" src="/main.js"></script>
+		<div id="viewmodel"></div>
 		<div id="debug">
 			BALLS test etetetstes te ste
-		</div>
-		<div id="errors">
-			<h3>CONSOLE</h3><hr>
-			hehhehehHEHHEHEHhHEhehhHEhhEHh<br>
 		</div>
 		<div id="menu">
 			<h1>Paused</h1>
 			<button id="resume">Resume</button><br><br>
 			<button>Options</button><br><br>
 			<button>Save Game</button><br><br>
+			<div id="errors">
+				<h3>CONSOLE</h3><hr>
+				hehhehehHEHHEHEHhHEhehhHEhhEHh<br>
+			</div>
 		</div>
+
+		<script type="module" src="/main.js"></script>
 	</body>
 </html>
