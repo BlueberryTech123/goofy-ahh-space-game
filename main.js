@@ -29,8 +29,6 @@ function loadTexture(path) {
     return texture;
 }
 const groundTiling = 4.0;
-const groundTexture = loadTexture("textures/ground.png");
-groundTexture.repeat.set(250 / groundTiling, 250 / groundTiling);
 
 // ========================================================================================
 
@@ -48,7 +46,7 @@ const ambient = new THREE.AmbientLight(0x233d70);
 scene.add(ambient);
 
 const groundGeometry = new THREE.PlaneGeometry(250, 250);
-const groundMaterial = new THREE.MeshBasicMaterial({ side: THREE.BackSide, map: groundTexture });
+const groundMaterial = new THREE.MeshBasicMaterial({ side: THREE.BackSide });
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.set(Math.PI/2, 0, Math.PI);
 
@@ -188,16 +186,24 @@ function lerp(a, b, alpha) {
     return a + alpha * (b - a);
 }
 function exec() {
-    let command = document.getElementById('command-prompt').value;
+    let commandRaw = document.getElementById('command-prompt').value;
+    const command = commandRaw.split(" ")[0];
+    let params = commandRaw.split(" ");
+    params.shift();
     let commands = {
-        "toLimit": () => {playerPosition.set(9223372036854700000, 0, 9223372036854700000)},
-        "toSpawn": () => {playerPosition.set(0, 0, 0)}
+        "toLimit": (params) => {playerPosition.set(9223372036854700000, 0, 9223372036854700000)},
+        "toSpawn": (params) => {playerPosition.set(0, 0, 0)},
+        "teleport": (params) => {
+            const x = parseInt(params[0]);
+            const z = parseInt(params[1]);
+            playerPosition.set(x, 0, z);
+        }
     }
     try {
-        commands[command]();
+        commands[command](params);
     }
-    catch {
-        alert("idiot");
+    catch (event) {
+        alert(event);
     }
 }
 
@@ -220,6 +226,27 @@ let timeElapsed = 0;
 // ========================================================================================
 document.addEventListener("DOMContentLoaded", load, false);
 
+const palettes = [0xc28a61, 0xbbbbbb, 0xa35d46, 0xb36868, 0x665e75]
+const groundTextures = [
+    loadTexture("textures/ground.png"), 
+    loadTexture("textures/ground2.png"),
+    loadTexture("textures/ground3.png")
+]
+for (let i = 0; i < groundTextures.length; i++) {
+    groundTextures[i].repeat.set(250 / groundTiling, 250 / groundTiling);
+}
+function randomize(seed = -1) {
+    // if (seed == -1) {
+    //     seed = new Date().getTime();
+    // }
+    const color = palettes[Math.floor(Math.random() * palettes.length)];
+    const texture = groundTextures[Math.floor(Math.random() * groundTextures.length)];
+
+    groundMaterial.color.set(color);
+    groundMaterial.map = texture;
+    groundMaterial.needsUpdate = true;
+}
+
 function load() {
     document.getElementById("commands").onsubmit = () => {
         exec();
@@ -230,6 +257,10 @@ function load() {
     document.getElementById("resume").addEventListener("click", () => {
         controls.lock();
     });
+
+    // Randomize shit idk
+
+    randomize();
 
     // Equip firts item
 
@@ -325,3 +356,11 @@ function update() {
     renderer.render(scene, camera);
 }
 update();
+
+
+/*
+Breaking poitns:
+teleport 1000000000000000 1000000000000000
+ - sky glitches out
+teleport 9000000000000000 1000000000000000
+*/

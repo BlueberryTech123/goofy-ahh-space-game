@@ -32,6 +32,15 @@ canvas {
     background-size: cover !important;
     pointer-events: none;
 }
+#crosshair {
+    width: 32px;
+    height: 32px;
+    position: fixed;
+    top: 50vh;
+    left: 50vw;
+    transform: translateX(-50%) translateY(-50%);
+    pointer-events: none;
+}
 #debug {
     background: rgba(69, 69, 69, 0.3);
     border: 1px dashed #bbb;
