@@ -28,9 +28,9 @@ function loadTexture(path) {
     texture.minFilter = texture.magFilter = THREE.NearestFilter;
     return texture;
 }
+const groundTiling = 4.0;
 const groundTexture = loadTexture("textures/ground.png");
-groundTexture.repeat.set(250 / 4, 250 / 4);
-// const skyboxTexture = loadTexture("textures/skybox.png");
+groundTexture.repeat.set(250 / groundTiling, 250 / groundTiling);
 
 // ========================================================================================
 
@@ -47,19 +47,78 @@ scene.background.minFilter = scene.background.magFilter = THREE.NearestFilter;
 const ambient = new THREE.AmbientLight(0x233d70);
 scene.add(ambient);
 
-// const skyboxGeometry = new THREE.BoxGeometry(500, 500, 500);
-// const skyboxMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, map: skyboxTexture });
-// const skybox = new THREE.Mesh(skyboxGeometry, skyboxMaterial);
-
 const groundGeometry = new THREE.PlaneGeometry(250, 250);
 const groundMaterial = new THREE.MeshBasicMaterial({ side: THREE.BackSide, map: groundTexture });
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.set(Math.PI/2, 0, Math.PI);
 
-// scene.add(skybox);
 scene.add(ground);
 
 // ========================================================================================
+
+
+
+class Item {
+    constructor(name, spritesheet, idle, useAnim, xOffset = 0) {
+        this.name = name;
+        this.spritesheet = spritesheet;
+        this.idle = idle;
+        this.useAnim = useAnim;
+        this.hasSecondUse = false;
+        this.xOffset = xOffset;
+    }   
+    use() {
+        animationQueue = [...this.useAnim];
+        frameTick = secondsPerFrame;
+    }
+    equip() {
+        viewmodel.style.background = `url("${curItem.spritesheet}")`;
+        viewmodelVerticalOffset = itemSwitchOffset;
+    }
+}
+
+let itemDict = {
+    "fist": new Item("Bare Fists", "textures/fist.png", 0, [0], 7.5),
+    "pistol": new Item("Pistol", "textures/pistol.png", 0, [0, 1, 2, 3, 0]),
+    "test": new Item("testing lmao", "textures/grass.png", 0, [0])
+}
+let animationQueue = [];
+let inventory = [
+    {"item": "fist", "keyCode": "1"},
+    {"item": "pistol", "keyCode": "2"}, 
+    {"item": "test", "keyCode": "3"},
+    {"item": null, "keyCode": "4"},
+    {"item": null, "keyCode": "5"},
+    {"item": null, "keyCode": "6"},
+    {"item": null, "keyCode": "7"},
+    {"item": null, "keyCode": "8"}
+];
+let slot = 0;
+let curItem = null;
+let viewmodelVerticalOffset = 0;
+const itemSwitchOffset = 50;
+
+const secondsPerFrame = 0.075;
+let frameTick = secondsPerFrame;
+document.addEventListener("mousedown", () => {
+    curItem.use();
+});
+
+function switchToItem(index, forced = false) {
+    if ((index == slot && !forced) || inventory[slot].item == null) {
+        return;
+    }
+
+    slot = index;
+    curItem = itemDict[inventory[slot].item];
+
+    // alert(`pppp ${JSON.stringify(curItem)}`);
+    curItem.equip();
+}
+
+
+// ========================================================================================
+
 
 let locked = false;
 controls.addEventListener("lock", () => {
@@ -71,6 +130,8 @@ controls.addEventListener("unlock", () => {
 	menu.style.display = "block";
     locked = false;
 });
+
+
 // Input shenanigans
 let horizontalAxisRaw = {left: 0, right: 0};
 let verticalAxisRaw = {up: 0, down: 0};
@@ -95,6 +156,12 @@ function onKeyDown(event) {
     if (keyCode == "d" || keyCode == "D" || keyCode == "ArrowRight") horizontalAxisRaw.right = 1;
 
     if (keyCode == "Shift") sprinting = 1;
+
+    for (let i = 0; i < Object.keys(itemDict).length; i++) {
+        if (keyCode == inventory[i].keyCode) {
+            switchToItem(i);
+        }
+    }
 }
 function onKeyUp(event) {
     let keyCode = event.key;
@@ -114,8 +181,24 @@ function onKeyUp(event) {
 function twoDecPlaces(value) {
     return Math.round(value * 100) / 100;
 }
+function groundTilePosition(value) {
+    return Math.round(value / groundTiling) * groundTiling;
+}
 function lerp(a, b, alpha) {
     return a + alpha * (b - a);
+}
+function exec() {
+    let command = document.getElementById('command-prompt').value;
+    let commands = {
+        "toLimit": () => {playerPosition.set(9223372036854700000, 0, 9223372036854700000)},
+        "toSpawn": () => {playerPosition.set(0, 0, 0)}
+    }
+    try {
+        commands[command]();
+    }
+    catch {
+        alert("idiot");
+    }
 }
 
 // ========================================================================================
@@ -135,47 +218,22 @@ let bobbingMultiplierLerped = 0;
 let timeElapsed = 0;
 
 // ========================================================================================
-
-
-
-class Item {
-    constructor(name, spritesheet, idle, useAnim) {
-        this.name = name;
-        this.spritesheet = spritesheet;
-        this.idle = idle;
-        this.useAnim = useAnim;
-        this.hasSecondUse = false;
-    }   
-}
-let itemDict = {
-    "pistol": new Item("Pistol", "textures/pistol.png", 0, [0, 1, 2, 3, 0])
-}
-
-let animationQueue = [];
-let inventory = ["pistol"];
-let slot = 0;
-let curItem = itemDict[inventory[slot]];
-
-const secondsPerFrame = 0.075;
-let frameTick = secondsPerFrame;
-document.addEventListener("mousedown", () => {
-    animationQueue = [...curItem.useAnim];
-    frameTick = secondsPerFrame;
-});
-
-// ========================================================================================
 document.addEventListener("DOMContentLoaded", load, false);
 
 function load() {
+    document.getElementById("commands").onsubmit = () => {
+        exec();
+        return false;
+    }
     debug = document.querySelector("#debug");
     viewmodel = document.querySelector("#viewmodel");
     document.getElementById("resume").addEventListener("click", () => {
         controls.lock();
     });
 
-    // remvov later
+    // Equip firts item
 
-    viewmodel.style.background = `url("${curItem.spritesheet}")`;
+    switchToItem(0, true);
 }
 function update() {
 	requestAnimationFrame(update);
@@ -222,10 +280,11 @@ function update() {
         0.5 * Math.sin(Math.sin(timeElapsed * 7) * Math.PI/2),
         1 - Math.cos(Math.sin(timeElapsed * 7) * Math.PI/2));
     bobbingOffset.multiplyScalar(5 * bobbingMultiplierLerped);
+    viewmodelVerticalOffset = lerp(viewmodelVerticalOffset, 0, 0.15);
 
     if (viewmodel) {
         viewmodel.style.transform = 
-            `translate(calc(${bobbingOffset.x}vh - 50%), calc(1px + ${bobbingOffset.y}vh))`;
+            `translate(calc(${bobbingOffset.x + curItem.xOffset}vh - 50%), calc(1px + ${bobbingOffset.y + viewmodelVerticalOffset}vh))`;
         
         // Animate viewmodel
         let spriteIndex = curItem.idle;
@@ -247,13 +306,13 @@ function update() {
     const finalCameraPosition = new THREE.Vector3(0, 0, 0);
     finalCameraPosition.addVectors(playerPosition, cameraOffset);
     camera.position.set(finalCameraPosition.x, finalCameraPosition.y, finalCameraPosition.z);
-    // skybox.position.set(finalCameraPosition.x, finalCameraPosition.y, finalCameraPosition.z);
-    // skybox.rotation.set(-timeElapsed * 0.005, -timeElapsed * 0.005, 0);
+
+    // Set ground position
+    ground.position.set(groundTilePosition(playerPosition.x), 0,  groundTilePosition(playerPosition.z));
 
     // ========================================================================================
 
     // Display debug info
-    // console.log(debug);
     if (debug != null) {
         debug.innerHTML = `
             <h3>DEBUG INFO</h3><hr>

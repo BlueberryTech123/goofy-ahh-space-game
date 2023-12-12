@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
-		<title>Penis man</title>
+		<title>PAAAAA</title>
         <script type="importmap">
             {
                 "imports": {
@@ -11,9 +11,12 @@
                 }
             }
         </script>
+		<script type="module" src="/main.js"></script>
 		<link rel="stylesheet" href="style.css">
 	</head>
 	<body onerror="document.getElementById('errors').innerHTML += `${event}<br>Line: ${lineno}<hr>`">
+		<!-- playerPosition.set(2147483647, 0, 2147483647) -->
+		
 		<div id="viewmodel"></div>
 		<div id="debug">
 			BALLS test etetetstes te ste
@@ -26,9 +29,11 @@
 			<div id="errors">
 				<h3>CONSOLE</h3><hr>
 				hehhehehHEHHEHEHhHEhehhHEhhEHh<br>
+				<form id="commands">
+					<input id="command-prompt">
+					<button type="submit">Execute Cmd</button>
+				</form>
 			</div>
 		</div>
-
-		<script type="module" src="/main.js"></script>
 	</body>
 </html>

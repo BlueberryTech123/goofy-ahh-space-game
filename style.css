@@ -43,15 +43,21 @@ canvas {
     width: 300px;
 }
 #errors {
+    background: rgba(69, 69, 69, 0.3);
     border: 1px dotted #aaa;
     color: #f00;
     padding: 10px;
     position: fixed;
     bottom: 10px;
     left: 10px;
-    width: 300px;
-    height: 250px;
+    width: 550px;
+    height: 350px;
     overflow-y: scroll;
+}
+#commands {
+    width: 100%;
+    position: fixed;
+    bottom: 0px;
 }
 
 #menu {
