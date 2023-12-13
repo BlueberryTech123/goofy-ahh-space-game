@@ -18,6 +18,8 @@ document.body.appendChild(renderer.domElement);
 // const controls = new OrbitControls(camera, renderer.domElement);
 const controls = new PointerLockControls(camera, document.body);
 const loader = new GLTFLoader();
+const interactRaycaster = new THREE.Raycaster();
+const combatRaycaster = new THREE.Raycaster();
 
 // ========================================================================================
 
@@ -57,13 +59,15 @@ scene.add(ground);
 
 
 class Item {
-    constructor(name, spritesheet, idle, useAnim, xOffset = 0) {
+    constructor(name, spritesheet, thumbnail, idle, useAnim, xOffset = 0) {
         this.name = name;
         this.spritesheet = spritesheet;
         this.idle = idle;
         this.useAnim = useAnim;
-        this.hasSecondUse = false;
+        this.thumbnail = thumbnail;
         this.xOffset = xOffset;
+
+        this.pickupMaterial = new THREE.MeshBasicMaterial({ map: loadTexture(thumbnail) });
     }   
     use() {
         animationQueue = [...this.useAnim];
@@ -75,16 +79,20 @@ class Item {
     }
 }
 
+const pickupGeometry = new THREE.BoxGeometry(1, 1, 1);
+
 let itemDict = {
-    "fist": new Item("Bare Fists", "textures/fist.png", 0, [0], 7.5),
-    "pistol": new Item("Pistol", "textures/pistol.png", 0, [0, 1, 2, 3, 0]),
-    "test": new Item("testing lmao", "textures/grass.png", 0, [0])
+    "fist": new Item("Bare Fists", "textures/fist.png", "textures/grass.png", 0, [0], 7.5),
+    "pistol": new Item("Pistol", "textures/pistol.png", "textures/grass.png", 0, [0, 1, 2, 3, 0]),
+    "test": new Item("testing lmao", "textures/grass.png", "textures/grass.png", 0, [0])
 }
+
+
 let animationQueue = [];
 let inventory = [
     {"item": "fist", "keyCode": "1"},
     {"item": "pistol", "keyCode": "2"}, 
-    {"item": "test", "keyCode": "3"},
+    {"item": null, "keyCode": "3"},
     {"item": null, "keyCode": "4"},
     {"item": null, "keyCode": "5"},
     {"item": null, "keyCode": "6"},
@@ -102,8 +110,20 @@ document.addEventListener("mousedown", () => {
     curItem.use();
 });
 
+function createPickup(position, itemId) {
+    const item = itemDict[itemId];
+    // const pickup = new THREE.Mesh(pickupGeometry, new THREE.MeshBasicMaterial({
+    //     map: //
+    // }));
+    const pickup = new THREE.Mesh(pickupGeometry, itemDict[itemId].pickupMaterial);
+    // alert(`${JSON.stringify(item)}\n${item.thumbnail}`);
+
+    pickup.position.set(position.x, position.y + 0.5, position.z);
+    pickup.userData = { item: itemId };
+    scene.add(pickup);
+}
 function switchToItem(index, forced = false) {
-    if ((index == slot && !forced) || inventory[slot].item == null) {
+    if ((index == slot && !forced) || inventory[index].item == null) {
         return;
     }
 
@@ -112,6 +132,17 @@ function switchToItem(index, forced = false) {
 
     // alert(`pppp ${JSON.stringify(curItem)}`);
     curItem.equip();
+}
+function addItem(itemId) {
+    for (let i = 0; i < inventory.length; i++) {
+        if (!inventory[i].item) {
+            inventory[i].item = itemId;
+            switchToItem(i);
+            // alert(i);
+            return true;
+        }
+    }
+    return false;
 }
 
 
@@ -155,9 +186,21 @@ function onKeyDown(event) {
 
     if (keyCode == "Shift") sprinting = 1;
 
-    for (let i = 0; i < Object.keys(itemDict).length; i++) {
+    for (let i = 0; i < inventory.length; i++) {
         if (keyCode == inventory[i].keyCode) {
             switchToItem(i);
+        }
+    }
+
+    if (keyCode == "f" || keyCode == "F") {
+        interactRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+        const intersect = interactRaycaster.intersectObjects(scene.children);
+        const item = intersect[0].object.userData.item;
+        
+        if (intersect.length > 0 && item) {
+            if (addItem(item)) {
+                scene.remove(intersect[0].object);
+            }
         }
     }
 }
@@ -197,6 +240,11 @@ function exec() {
             const x = parseInt(params[0]);
             const z = parseInt(params[1]);
             playerPosition.set(x, 0, z);
+        },
+        "spawnThingy": (params) => {
+            const x = parseInt(params[0]);
+            const z = parseInt(params[1]);
+            createPickup(new THREE.Vector3(x, 0, z), "test");
         }
     }
     try {
