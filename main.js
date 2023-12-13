@@ -91,7 +91,7 @@ let itemDict = {
 let animationQueue = [];
 let inventory = [
     {"item": "fist", "keyCode": "1"},
-    {"item": "pistol", "keyCode": "2"}, 
+    {"item": null, "keyCode": "2"}, 
     {"item": null, "keyCode": "3"},
     {"item": null, "keyCode": "4"},
     {"item": null, "keyCode": "5"},
@@ -241,10 +241,9 @@ function exec() {
             const z = parseInt(params[1]);
             playerPosition.set(x, 0, z);
         },
-        "spawnThingy": (params) => {
-            const x = parseInt(params[0]);
-            const z = parseInt(params[1]);
-            createPickup(new THREE.Vector3(x, 0, z), "test");
+        "spawnItem": (params) => {
+            const itemId = params[0];
+            createPickup(new THREE.Vector3(playerPosition.x, 0, playerPosition.z), itemId);
         }
     }
     try {
