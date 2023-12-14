@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x010203, 15, 85);
+scene.fog = new THREE.Fog(0x010203, 0, 80);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 let debug = null;
 let viewmodel = null;
@@ -13,12 +13,14 @@ const renderer = new THREE.WebGLRenderer();
 const cock = new THREE.Clock();
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.antialias = true;
+renderer.outputEncoding = THREE.sRGBEncoding;
 document.body.appendChild(renderer.domElement);
 
 // const controls = new OrbitControls(camera, renderer.domElement);
 const controls = new PointerLockControls(camera, document.body);
 const loader = new GLTFLoader();
 const interactRaycaster = new THREE.Raycaster();
+interactRaycaster.far = 3.5;
 const combatRaycaster = new THREE.Raycaster();
 
 // ========================================================================================
@@ -44,11 +46,11 @@ scene.background = new THREE.CubeTextureLoader().setPath("textures/skybox/").loa
     "back.png"
 ]);
 scene.background.minFilter = scene.background.magFilter = THREE.NearestFilter;
-const ambient = new THREE.AmbientLight(0x233d70);
+const ambient = new THREE.AmbientLight(0xe0f6ff);
 scene.add(ambient);
 
 const groundGeometry = new THREE.PlaneGeometry(250, 250);
-const groundMaterial = new THREE.MeshBasicMaterial({ side: THREE.BackSide });
+const groundMaterial = new THREE.MeshPhongMaterial({ side: THREE.BackSide });
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.set(Math.PI/2, 0, Math.PI);
 
@@ -56,7 +58,10 @@ scene.add(ground);
 
 // ========================================================================================
 
+const crateTexture = loadTexture("textures/crate.png");
+const crateMaterial = new THREE.MeshPhongMaterial({ map: crateTexture });
 
+// ========================================================================================
 
 class Item {
     constructor(name, spritesheet, thumbnail, idle, useAnim, xOffset = 0) {
@@ -67,7 +72,7 @@ class Item {
         this.thumbnail = thumbnail;
         this.xOffset = xOffset;
 
-        this.pickupMaterial = new THREE.MeshBasicMaterial({ map: loadTexture(thumbnail) });
+        this.pickupMaterial = new THREE.SpriteMaterial({ map: loadTexture(thumbnail) });
     }   
     use() {
         animationQueue = [...this.useAnim];
@@ -79,13 +84,14 @@ class Item {
     }
 }
 
-const pickupGeometry = new THREE.BoxGeometry(1, 1, 1);
-
-let itemDict = {
+const itemDict = {
     "fist": new Item("Bare Fists", "textures/fist.png", "textures/grass.png", 0, [0], 7.5),
-    "pistol": new Item("Pistol", "textures/pistol.png", "textures/grass.png", 0, [0, 1, 2, 3, 0]),
+    "pistol": new Item("Pistol", "textures/pistol.png", "textures/skybox/right.png", 0, [0, 1, 2, 3, 0]),
     "test": new Item("testing lmao", "textures/grass.png", "textures/grass.png", 0, [0])
 }
+const lootTables = {
+    "regular": ["pistol", "test"]
+} 
 
 
 let animationQueue = [];
@@ -110,12 +116,22 @@ document.addEventListener("mousedown", () => {
     curItem.use();
 });
 
-function createPickup(position, itemId) {
+function spawnCrate(position, lootTable) {
+    const crateGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const crate = new THREE.Mesh(crateGeometry, crateMaterial)
+    
+    crate.position.set(position.x, position.y + 0.5, position.z);
+    crate.rotateY(Math.random() * 2 * Math.PI);
+    crate.userData = { lootTable: lootTable };
+
+    scene.add(crate);
+}
+function spawnPickup(position, itemId) {
     const item = itemDict[itemId];
     // const pickup = new THREE.Mesh(pickupGeometry, new THREE.MeshBasicMaterial({
     //     map: //
     // }));
-    const pickup = new THREE.Mesh(pickupGeometry, itemDict[itemId].pickupMaterial);
+    const pickup = new THREE.Sprite(itemDict[itemId].pickupMaterial);
     // alert(`${JSON.stringify(item)}\n${item.thumbnail}`);
 
     pickup.position.set(position.x, position.y + 0.5, position.z);
@@ -143,6 +159,43 @@ function addItem(itemId) {
         }
     }
     return false;
+}
+function dropItem() {
+    // You can't drop your hands (no shit)
+    if (slot == 0) {
+        return;
+    }
+    const droppedItemId = inventory[slot].item;
+    
+    interactRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const intersect = interactRaycaster.intersectObjects(scene.children);
+
+    let point = null;
+
+    if (intersect.length == 0) {
+        let forwardVector = new THREE.Vector3(0, 0, -1);
+        forwardVector.applyQuaternion(camera.quaternion);
+        forwardVector.multiplyScalar(interactRaycaster.far);
+
+        point = camera.position.clone();
+        point.add(forwardVector);
+        point.setY(0);
+        // alert(JSON.stringify(point));
+    }
+    else {
+        point = intersect[0].point;
+    }
+    inventory[slot].item = null;
+
+    spawnPickup(new THREE.Vector3(point.x, 0, point.z), droppedItemId);
+
+    let nextAvailableSlot = 0;
+    for (let i = 0; i < inventory.length; i++) {
+        if (inventory[i].item) {
+            nextAvailableSlot = i;
+        }
+    }
+    switchToItem(nextAvailableSlot);
 }
 
 
@@ -177,6 +230,8 @@ document.addEventListener("keyup", onKeyUp, false);
 
 
 function onKeyDown(event) {
+    if (!locked) return;
+
     let keyCode = event.key;
 
     if (keyCode == "w" || keyCode == "W" || keyCode == "ArrowUp") verticalAxisRaw.up = 1;
@@ -195,16 +250,41 @@ function onKeyDown(event) {
     if (keyCode == "f" || keyCode == "F") {
         interactRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
         const intersect = interactRaycaster.intersectObjects(scene.children);
-        const item = intersect[0].object.userData.item;
-        
-        if (intersect.length > 0 && item) {
-            if (addItem(item)) {
-                scene.remove(intersect[0].object);
+
+        if (intersect.length > 0) {
+            const intersectObject = intersect[0].object;
+            const item = intersectObject.userData.item;
+            const lootTable = intersectObject.userData.lootTable;
+            
+            if (item && addItem(item)) {
+                scene.remove(intersectObject);
+            }
+            else if (lootTable) {
+                for (let i = 0; i < Math.random() * 3 + 1; i++) {
+                    const curLootTable = lootTables[lootTable];
+                    let point = intersectObject.position.clone();
+                    point.setY(0);
+                    point.add(new THREE.Vector3(Math.random() * 4 - 2, 0, Math.random() * 4 - 2));
+
+                    const itemId = curLootTable[Math.floor(Math.random() * curLootTable.length)];
+                    // alert(`${curLootTable}\n${curLootTable.length}\n${itemId}`);
+    
+                    spawnPickup(point, itemId);
+                }
+                scene.remove(intersectObject);
             }
         }
     }
+    if (keyCode == "q" || keyCode == "Q") {
+        dropItem();
+    }
 }
 function onKeyUp(event) {
+    if (!locked) {
+        verticalAxisRaw.up = verticalAxisRaw.down = horizontalAxisRaw.left = horizontalAxisRaw.right = sprinting = 0;
+        return;
+    }
+
     let keyCode = event.key;
 
     if (keyCode == "w" || keyCode == "W" || keyCode == "ArrowUp") verticalAxisRaw.up = 0;
@@ -243,7 +323,10 @@ function exec() {
         },
         "spawnItem": (params) => {
             const itemId = params[0];
-            createPickup(new THREE.Vector3(playerPosition.x, 0, playerPosition.z), itemId);
+            spawnPickup(new THREE.Vector3(playerPosition.x, 0, playerPosition.z), itemId);
+        },
+        "spawnCrate": (params) => {
+            spawnCrate(new THREE.Vector3(playerPosition.x, 0, playerPosition.z), "regular");
         }
     }
     try {
