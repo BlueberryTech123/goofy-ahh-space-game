@@ -60,11 +60,57 @@ scene.add(ground);
 
 // ========================================================================================
 
+// Props
+
 const crateTexture = loadTexture("textures/crate.png");
 const crateMaterial = new THREE.MeshPhongMaterial({ map: crateTexture });
 
+function crate(position, chunkId, lootTable) {
+    const crateGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const crate = new THREE.Mesh(crateGeometry, crateMaterial)
+    
+    crate.position.set(position.x, position.y + 0.5, position.z);
+    crate.rotateY(Math.random() * 2 * Math.PI);
+    crate.userData = { lootTable: lootTable, chunkId: chunkId };
+
+    return crate;
+}
+
 const bushTexture = loadTexture("textures/bush.png");
 const bushMaterial = new THREE.SpriteMaterial({ map: bushTexture });
+
+function bush(position, chunkId) {
+    const bush = new THREE.Sprite(bushMaterial);
+    bush.scale.set(2, 2, 2);
+    bush.position.set(position.x, position.y + 1, position.z);
+
+    bush.userData = { chunkId: chunkId };
+
+    return bush;
+}
+
+const barrelTexture = loadTexture("textures/barrel.png");
+const barrelMaterial = new THREE.SpriteMaterial({ map: barrelTexture });
+
+function barrel(position, chunkId) {
+    const barrel = new THREE.Sprite(barrelMaterial);
+    barrel.scale.set(2, 2, 2);
+    barrel.position.set(position.x, position.y + 1, position.z);
+
+    barrel.userData = { chunkId: chunkId };
+
+    return barrel;
+}
+
+
+const propTypes = {
+    "crate": (position, chunkId) => {
+        return crate(position, chunkId, "regular");
+    },
+    "bush": bush,
+    "barrel": barrel
+}
+
 
 // ========================================================================================
 
@@ -121,26 +167,6 @@ let frameTick = secondsPerFrame;
 document.addEventListener("mousedown", () => {
     curItem.use();
 });
-
-function crate(position, chunkId, lootTable) {
-    const crateGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const crate = new THREE.Mesh(crateGeometry, crateMaterial)
-    
-    crate.position.set(position.x, position.y + 0.5, position.z);
-    crate.rotateY(Math.random() * 2 * Math.PI);
-    crate.userData = { lootTable: lootTable, chunkId: chunkId };
-
-    return crate;
-}
-function bush(position, chunkId) {
-    const bush = new THREE.Sprite(bushMaterial);
-    bush.scale.set(2, 2, 2);
-    bush.position.set(position.x, position.y + 1, position.z);
-
-    bush.userData = { chunkId: chunkId };
-
-    return bush;
-}
 function spawnPickup(position, itemId) {
     const item = itemDict[itemId];
     // const pickup = new THREE.Mesh(pickupGeometry, new THREE.MeshBasicMaterial({
@@ -397,24 +423,27 @@ const groundTextures = [
     loadTexture("textures/ground2.png"),
     loadTexture("textures/ground3.png")
 ]
-
-const propTypes = {
-    "crate": (position, chunkId) => {
-        return crate(position, chunkId, "regular");
-    },
-    "bush": (position, chunkId) => {
-        return bush(position, chunkId);
-    }
-}
 const chunkTypes = {
     "empty": [],
     "normalLoot": ["bush", "crate"],
-    "trees": ["bush"]
+    "foliage": ["bush"],
+    "oilField": ["bush", "crate", "barrel"]
 }
 const chunkTable = []
 let chunks = {};
 let worldSeed = 95;
 const renderDiameter = 8;
+function addChunkWeight(name, weight) {
+    for (let i = 0; i < weight; i++) {
+        chunkTable.push(name);
+    }
+}
+
+addChunkWeight("empty", 65);
+addChunkWeight("normalLoot", 10);
+addChunkWeight("oilField", 1);
+addChunkWeight("foliage", 52);
+
 
 class Chunk {
     constructor(chunkPosition) {
@@ -487,11 +516,6 @@ class Chunk {
 function generateChunkId(chunkPosition) {
     return btoa(`${chunkPosition.x} ${chunkPosition.y}`);
 }
-function addChunkWeight(name, weight) {
-    for (let i = 0; i < weight; i++) {
-        chunkTable.push(name);
-    }
-}
 function loadChunk(chunkPosition) {
     let chunkId = generateChunkId(chunkPosition);
     if (!(chunkId in chunks)) {
@@ -520,10 +544,6 @@ function surroundingChunks(position) {
     }
     return chunkPositions;
 }
-
-addChunkWeight("empty", 15);
-addChunkWeight("normalLoot", 2);
-addChunkWeight("trees", 4);
 
 
 for (let i = 0; i < groundTextures.length; i++) {
