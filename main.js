@@ -30,6 +30,8 @@ function loadTexture(path) {
     let texture = new THREE.TextureLoader().load(path);
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     texture.minFilter = texture.magFilter = THREE.NearestFilter;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
     return texture;
 }
 const groundTiling = 4.0;
@@ -61,8 +63,8 @@ scene.add(ground);
 const crateTexture = loadTexture("textures/crate.png");
 const crateMaterial = new THREE.MeshPhongMaterial({ map: crateTexture });
 
-const treeTexture = loadTexture("textures/grass.png");
-const treeMaterial = new THREE.SpriteMaterial(treeTexture);
+const bushTexture = loadTexture("textures/bush.png");
+const bushMaterial = new THREE.SpriteMaterial({ map: bushTexture });
 
 // ========================================================================================
 
@@ -89,11 +91,12 @@ class Item {
 
 const itemDict = {
     "fist": new Item("Bare Fists", "textures/fist.png", "textures/grass.png", 0, [0], 7.5),
-    "pistol": new Item("Pistol", "textures/pistol.png", "textures/skybox/right.png", 0, [0, 1, 2, 3, 0]),
-    "test": new Item("testing lmao", "textures/grass.png", "textures/grass.png", 0, [0])
+    "pistol": new Item("Pistol", "textures/pistol.png", "textures/items/pistol.png", 0, [0, 1, 2, 0]),
+    "test": new Item("testing lmao", "textures/grass.png", "textures/grass.png", 0, [0]),
+    "medkit": new Item("Medkit", "textures/grass.png", "textures/items/medkit.png", 0, [0])
 }
 const lootTables = {
-    "regular": ["pistol", "test"]
+    "regular": ["pistol", "medkit"]
 } 
 
 
@@ -119,22 +122,24 @@ document.addEventListener("mousedown", () => {
     curItem.use();
 });
 
-function crate(position, lootTable) {
+function crate(position, chunkId, lootTable) {
     const crateGeometry = new THREE.BoxGeometry(1, 1, 1);
     const crate = new THREE.Mesh(crateGeometry, crateMaterial)
     
     crate.position.set(position.x, position.y + 0.5, position.z);
     crate.rotateY(Math.random() * 2 * Math.PI);
-    crate.userData = { lootTable: lootTable };
+    crate.userData = { lootTable: lootTable, chunkId: chunkId };
 
     return crate;
 }
-function tree(position) {
-    const tree = new THREE.Sprite(treeMaterial);
-    tree.scale.set(2, 2, 2);
-    tree.position.set(position.x, position.y + 0.5, position.z);
+function bush(position, chunkId) {
+    const bush = new THREE.Sprite(bushMaterial);
+    bush.scale.set(2, 2, 2);
+    bush.position.set(position.x, position.y + 1, position.z);
 
-    return tree;
+    bush.userData = { chunkId: chunkId };
+
+    return bush;
 }
 function spawnPickup(position, itemId) {
     const item = itemDict[itemId];
@@ -144,8 +149,10 @@ function spawnPickup(position, itemId) {
     const pickup = new THREE.Sprite(itemDict[itemId].pickupMaterial);
     // alert(`${JSON.stringify(item)}\n${item.thumbnail}`);
 
-    pickup.position.set(position.x, position.y + 0.5, position.z);
+    pickup.position.set(position.x, position.y + 0.25, position.z);
     pickup.userData = { item: itemId };
+
+    pickup.scale.set(0.5, 0.5, 0.5);
     scene.add(pickup);
 }
 function switchToItem(index, forced = false) {
@@ -281,7 +288,11 @@ function onKeyDown(event) {
     
                     spawnPickup(point, itemId);
                 }
-                scene.remove(intersectObject);
+
+                // scene.remove(intersectObject);
+                if (intersectObject.chunkId) {
+                    chunks[intersectObject.chunkId].remove(intersectObject);
+                }
             }
         }
     }
@@ -309,7 +320,7 @@ function onKeyUp(event) {
 
 // Utility functions
 
-const psuedoRandRaw = btoa("abcdbfogwuehgwi&^%^(e)gaysex%*^&puerhfipuwehbyrnodgsimgr&^*%(*^)&%^%$*#^$%&*^%$#^*$&%(*nfebhofibyskunrdghuewbgsrdtnuoiwerd%$#@&%$^*%&^*%(&*%$&@$^&#%$*^%&(^)*(&%#$&%^$*%&(*^)(&%#*@#&^$%");
+const psuedoRandRaw = btoa("CbiTE7UI^8#Lou(RA4mrjXlJ2FYfa*cHy5ks!W6&gVOB$twGhS%e)@pMdD91Zzq3nNxvQK0P");
 const psuedoRand = [];
 // Set up psuedo random number array
 for (let i = 0; i < psuedoRandRaw.length; i++) {
@@ -380,7 +391,7 @@ let timeElapsed = 0;
 // ========================================================================================
 document.addEventListener("DOMContentLoaded", load, false);
 
-const palettes = [0xc28a61, 0xbbbbbb, 0xa35d46, 0xb36868, 0x665e75]
+const palettes = [0xd19b73, 0xbbbbbb, 0xe39378, 0xcfb286, 0xa89dbd]
 const groundTextures = [
     loadTexture("textures/ground.png"), 
     loadTexture("textures/ground2.png"),
@@ -388,24 +399,26 @@ const groundTextures = [
 ]
 
 const propTypes = {
-    "crate": (position) => {
-        return crate(position, "regular");
+    "crate": (position, chunkId) => {
+        return crate(position, chunkId, "regular");
     },
-    "tree": (position) => {
-        return tree(position);
+    "bush": (position, chunkId) => {
+        return bush(position, chunkId);
     }
 }
 const chunkTypes = {
     "empty": [],
-    "normalLoot": ["tree", "crate"],
-    "trees": ["tree"]
+    "normalLoot": ["bush", "crate"],
+    "trees": ["bush"]
 }
 const chunkTable = []
 let chunks = {};
 let worldSeed = 95;
+const renderDiameter = 8;
+
 class Chunk {
     constructor(chunkPosition) {
-        this.chunkString = generateChunkString(chunkPosition);
+        this.chunkId = generateChunkId(chunkPosition);
         this.chunkPosition = chunkPosition;
         this.seed = worldSeed + chunkPosition.x + chunkPosition.y;
         this.type = chunkTable[Math.floor(seededRandom(this.seed) * chunkTable.length)];
@@ -414,6 +427,7 @@ class Chunk {
         this.worldChunkPosition.multiplyScalar(16);
 
         this.children = [];
+        this.rendered = false;
 
         const chunkProps = chunkTypes[this.type];
         // alert(this.type)
@@ -427,12 +441,15 @@ class Chunk {
             position.add(this.worldChunkPosition);
             const prop = chunkProps[Math.floor(seededRandom(this.seed + i) * chunkProps.length)];
             // alert(prop);
-            this.children.push(propTypes[prop](position));
+            this.children.push(propTypes[prop](position, this.chunkId));
         }
         // alert(JSON.stringify(this.children));
     }
 
     render() {
+        if (this.rendered) return;
+
+        this.rendered = true;
         for (let i = 0; i < this.children.length; i++) {
             const cur = this.children[i];
             if (!cur) { // Remove null items
@@ -444,6 +461,7 @@ class Chunk {
         }
     }
     unrender() {
+        this.rendered = false;
         for (let i = 0; i < this.children.length; i++) {
             const cur = this.children[i];
             if (!cur) { // Remove null items
@@ -454,9 +472,19 @@ class Chunk {
             scene.remove(cur);
         }
     }
+
+    remove(child) {
+        for (let i = 0; i < this.children.length; i++) {
+            const cur = this.children[i];
+            if (cur == child) {
+                scene.remove(child);
+                this.children.splice(i, 1);
+            }
+        }
+    }
 }
 
-function generateChunkString(chunkPosition) {
+function generateChunkId(chunkPosition) {
     return btoa(`${chunkPosition.x} ${chunkPosition.y}`);
 }
 function addChunkWeight(name, weight) {
@@ -465,14 +493,14 @@ function addChunkWeight(name, weight) {
     }
 }
 function loadChunk(chunkPosition) {
-    let chunkString = generateChunkString(chunkPosition);
-    if (!(chunkString in chunks)) {
+    let chunkId = generateChunkId(chunkPosition);
+    if (!(chunkId in chunks)) {
         const newChunk = new Chunk(chunkPosition);
-        chunks[chunkString] = newChunk;
+        chunks[chunkId] = newChunk;
         newChunk.render();
     }
     else {
-        chunks[chunkString].render();
+        chunks[chunkId].render();
     }
 }
 function worldToChunkPosition(position) {
@@ -483,10 +511,10 @@ function worldToChunkPosition(position) {
 function surroundingChunks(position) {
     const centralChunk = worldToChunkPosition(position);
     let chunkPositions = [];
-    for (let i = 0; i < 8; i++) {
-        for (let j = 0; j < 8; j++) {
+    for (let i = 0; i < renderDiameter; i++) {
+        for (let j = 0; j < renderDiameter; j++) {
             let cur = centralChunk.clone();
-            cur.add(new THREE.Vector2(-4 + i, -4 + j));
+            cur.add(new THREE.Vector2(-renderDiameter / 2 + i, -renderDiameter / 2 + j));
             chunkPositions.push(cur);
         }
     }
@@ -495,7 +523,7 @@ function surroundingChunks(position) {
 
 addChunkWeight("empty", 15);
 addChunkWeight("normalLoot", 2);
-// addChunkWeight("trees", 4);
+addChunkWeight("trees", 4);
 
 
 for (let i = 0; i < groundTextures.length; i++) {
@@ -532,6 +560,7 @@ function load() {
 
     switchToItem(0, true);
 }
+let chunkPositions = [];
 function update() {
 	requestAnimationFrame(update);
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -546,7 +575,14 @@ function update() {
 
     // Load surrounding chunks
 
-    const chunkPositions = surroundingChunks(playerPosition);
+    const newChunkPositions = surroundingChunks(playerPosition);
+    for (let i = 0; i < chunkPositions.length; i++) {
+        const cur = chunkPositions[i];
+        if (!(cur in newChunkPositions)) {
+            chunks[generateChunkId(cur)].unrender();
+        }
+    }
+    chunkPositions = newChunkPositions;
     // alert(JSON.stringify(chunkPositions));
     for (let i = 0; i < chunkPositions.length; i++) {
         loadChunk(chunkPositions[i]);
