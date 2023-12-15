@@ -61,6 +61,9 @@ scene.add(ground);
 const crateTexture = loadTexture("textures/crate.png");
 const crateMaterial = new THREE.MeshPhongMaterial({ map: crateTexture });
 
+const treeTexture = loadTexture("textures/grass.png");
+const treeMaterial = new THREE.SpriteMaterial(treeTexture);
+
 // ========================================================================================
 
 class Item {
@@ -116,7 +119,7 @@ document.addEventListener("mousedown", () => {
     curItem.use();
 });
 
-function spawnCrate(position, lootTable) {
+function crate(position, lootTable) {
     const crateGeometry = new THREE.BoxGeometry(1, 1, 1);
     const crate = new THREE.Mesh(crateGeometry, crateMaterial)
     
@@ -124,7 +127,14 @@ function spawnCrate(position, lootTable) {
     crate.rotateY(Math.random() * 2 * Math.PI);
     crate.userData = { lootTable: lootTable };
 
-    scene.add(crate);
+    return crate;
+}
+function tree(position) {
+    const tree = new THREE.Sprite(treeMaterial);
+    tree.scale.set(2, 2, 2);
+    tree.position.set(position.x, position.y + 0.5, position.z);
+
+    return tree;
 }
 function spawnPickup(position, itemId) {
     const item = itemDict[itemId];
@@ -299,6 +309,20 @@ function onKeyUp(event) {
 
 // Utility functions
 
+const psuedoRandRaw = btoa("abcdbfogwuehgwi&^%^(e)gaysex%*^&puerhfipuwehbyrnodgsimgr&^*%(*^)&%^%$*#^$%&*^%$#^*$&%(*nfebhofibyskunrdghuewbgsrdtnuoiwerd%$#@&%$^*%&^*%(&*%$&@$^&#%$*^%&(^)*(&%#$&%^$*%&(*^)(&%#*@#&^$%");
+const psuedoRand = [];
+// Set up psuedo random number array
+for (let i = 0; i < psuedoRandRaw.length; i++) {
+    const cur = psuedoRandRaw.charCodeAt(i) / 127;
+    psuedoRand.push(cur);
+    // console.log(cur)
+}
+let seed = 0;
+
+function seededRandom() {
+    seed++;
+    return psuedoRand[Math.abs(seed % psuedoRand.length)];
+}
 function twoDecPlaces(value) {
     return Math.round(value * 100) / 100;
 }
@@ -326,7 +350,7 @@ function exec() {
             spawnPickup(new THREE.Vector3(playerPosition.x, 0, playerPosition.z), itemId);
         },
         "spawnCrate": (params) => {
-            spawnCrate(new THREE.Vector3(playerPosition.x, 0, playerPosition.z), "regular");
+            // spawnCrate(new THREE.Vector3(playerPosition.x, 0, playerPosition.z), "regular");
         }
     }
     try {
@@ -362,6 +386,118 @@ const groundTextures = [
     loadTexture("textures/ground2.png"),
     loadTexture("textures/ground3.png")
 ]
+
+const propTypes = {
+    "crate": (position) => {
+        return crate(position, "regular");
+    },
+    "tree": (position) => {
+        return tree(position);
+    }
+}
+const chunkTypes = {
+    "empty": [],
+    "normalLoot": ["tree", "crate"],
+    "trees": ["tree"]
+}
+const chunkTable = []
+let chunks = {};
+let worldSeed = 95;
+class Chunk {
+    constructor(chunkPosition) {
+        this.chunkString = generateChunkString(chunkPosition);
+        this.chunkPosition = chunkPosition;
+        this.seed = worldSeed + chunkPosition.x + chunkPosition.y;
+        this.type = chunkTable[Math.floor(seededRandom(this.seed) * chunkTable.length)];
+
+        this.worldChunkPosition = new THREE.Vector3(chunkPosition.x, 0, chunkPosition.y);
+        this.worldChunkPosition.multiplyScalar(16);
+
+        this.children = [];
+
+        const chunkProps = chunkTypes[this.type];
+        // alert(this.type)
+        if (chunkProps.length == 0) return;
+
+        for (let i = 0; i < 1 + seededRandom(this.seed) * 3; i++) {
+            const position = new THREE.Vector3(
+                seededRandom(this.seed + i + 2) * 16, 0,
+                seededRandom(this.seed + i + 4) * 16
+            );
+            position.add(this.worldChunkPosition);
+            const prop = chunkProps[Math.floor(seededRandom(this.seed + i) * chunkProps.length)];
+            // alert(prop);
+            this.children.push(propTypes[prop](position));
+        }
+        // alert(JSON.stringify(this.children));
+    }
+
+    render() {
+        for (let i = 0; i < this.children.length; i++) {
+            const cur = this.children[i];
+            if (!cur) { // Remove null items
+                this.children.splice(i, 1);
+                continue;
+            }
+
+            scene.add(cur);
+        }
+    }
+    unrender() {
+        for (let i = 0; i < this.children.length; i++) {
+            const cur = this.children[i];
+            if (!cur) { // Remove null items
+                this.children.splice(i, 1);
+                continue;
+            }
+
+            scene.remove(cur);
+        }
+    }
+}
+
+function generateChunkString(chunkPosition) {
+    return btoa(`${chunkPosition.x} ${chunkPosition.y}`);
+}
+function addChunkWeight(name, weight) {
+    for (let i = 0; i < weight; i++) {
+        chunkTable.push(name);
+    }
+}
+function loadChunk(chunkPosition) {
+    let chunkString = generateChunkString(chunkPosition);
+    if (!(chunkString in chunks)) {
+        const newChunk = new Chunk(chunkPosition);
+        chunks[chunkString] = newChunk;
+        newChunk.render();
+    }
+    else {
+        chunks[chunkString].render();
+    }
+}
+function worldToChunkPosition(position) {
+    return new THREE.Vector2(
+        Math.floor(position.x / 16),
+        Math.floor(position.z / 16));
+}
+function surroundingChunks(position) {
+    const centralChunk = worldToChunkPosition(position);
+    let chunkPositions = [];
+    for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+            let cur = centralChunk.clone();
+            cur.add(new THREE.Vector2(-4 + i, -4 + j));
+            chunkPositions.push(cur);
+        }
+    }
+    return chunkPositions;
+}
+
+addChunkWeight("empty", 15);
+addChunkWeight("normalLoot", 2);
+// addChunkWeight("trees", 4);
+
+
 for (let i = 0; i < groundTextures.length; i++) {
     groundTextures[i].repeat.set(250 / groundTiling, 250 / groundTiling);
 }
@@ -407,6 +543,14 @@ function update() {
     timeElapsed += deltaTime;
 
     // ========================================================================================
+
+    // Load surrounding chunks
+
+    const chunkPositions = surroundingChunks(playerPosition);
+    // alert(JSON.stringify(chunkPositions));
+    for (let i = 0; i < chunkPositions.length; i++) {
+        loadChunk(chunkPositions[i]);
+    }
 
     // Code here ig
     const theta = camera.rotation.y;
