@@ -49,7 +49,10 @@ scene.background = new THREE.CubeTextureLoader().setPath("textures/skybox/").loa
 ]);
 scene.background.minFilter = scene.background.magFilter = THREE.NearestFilter;
 const ambient = new THREE.AmbientLight(0xe0f6ff);
+const directional = new THREE.DirectionalLight(0xffcc99, 3.5);
+directional.castShadow = true;
 scene.add(ambient);
+scene.add(directional);
 
 const groundGeometry = new THREE.PlaneGeometry(250, 250);
 const groundMaterial = new THREE.MeshPhongMaterial({ side: THREE.BackSide });
@@ -70,6 +73,7 @@ function crate(position, chunkId, lootTable) {
     const crate = new THREE.Mesh(crateGeometry, crateMaterial)
     
     crate.position.set(position.x, position.y + 0.5, position.z);
+    crate.castShadow = true;
     crate.rotateY(Math.random() * 2 * Math.PI);
     crate.userData = { lootTable: lootTable, chunkId: chunkId };
 
@@ -693,4 +697,6 @@ Breaking poitns:
 teleport 1000000000000000 1000000000000000
  - sky glitches out
 teleport 9000000000000000 1000000000000000
+
+jitteriness at: teleport -10000000000000 0
 */
