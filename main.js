@@ -49,7 +49,7 @@ scene.background = new THREE.CubeTextureLoader().setPath("textures/skybox/").loa
 ]);
 scene.background.minFilter = scene.background.magFilter = THREE.NearestFilter;
 const ambient = new THREE.AmbientLight(0xe0f6ff);
-const directional = new THREE.DirectionalLight(0xffcc99, 3.5);
+const directional = new THREE.DirectionalLight(0xd6cec5, 3.5);
 directional.castShadow = true;
 scene.add(ambient);
 scene.add(directional);
@@ -510,8 +510,9 @@ class Chunk {
         for (let i = 0; i < this.children.length; i++) {
             const cur = this.children[i];
             if (cur == child) {
-                scene.remove(child);
+                alert("balls");
                 this.children.splice(i, 1);
+                scene.remove(child);
             }
         }
     }
